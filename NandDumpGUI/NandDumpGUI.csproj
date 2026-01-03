@@ -6,13 +6,26 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>nand_gui.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="nand_gui.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="nand_gui.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\bchlib\bchlib.vcxproj" ReferenceOutputAssembly="false">
       <Private>False</Private>
       <CopyLocalSatelliteAssemblies>True</CopyLocalSatelliteAssemblies>
     </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="nand_gui.png" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

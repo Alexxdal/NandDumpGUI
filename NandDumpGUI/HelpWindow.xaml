@@ -3,9 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="User Guide"
         Height="620" Width="820"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner" Icon="/nand_gui.png">
     <Grid Margin="12">
-        <TabControl>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="157*"/>
+            <ColumnDefinition Width="42*"/>
+        </Grid.ColumnDefinitions>
+        <TabControl Grid.ColumnSpan="2">
             <TabItem Header="Quick Start">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <TextBlock TextWrapping="Wrap" FontSize="14">

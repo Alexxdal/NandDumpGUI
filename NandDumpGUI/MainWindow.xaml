@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="NandDumpGUI"
         Height="720" Width="980"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen" Icon="/nand_gui.png">
     <DockPanel Margin="10">
 
         <!-- Menu -->
