@@ -46,34 +46,61 @@ namespace NandDumpGUI.Core
             {
                 ct.ThrowIfCancellationRequested();
 
+                if (!IsBchParamPlausible(m, t))
+                    continue;
+
                 // quick sanity: eccLen ≈ ceil(m*t/8)
                 int eccLenExpected = (m * t + 7) / 8;
                 if (eccLenExpected != layout.EccLen)
                     continue;
 
-                using var bch = BchContext.Create(m, t, poly, swapBits: false);
-
-                foreach (var oobdata in oobCandidates)
+                BchContext bch;
+                try
                 {
-                    if (oobdata < 0 || oobdata > layout.EccOfs) continue;
+                    bch = BchContext.Create(m, t, poly, swapBits: false);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    log?.Report($"[AutoDetect] bch_init failed: m={m} t={t} poly=0x{poly:X} -> {ex.Message}");
+                    continue;
+                }
 
-                    foreach (var tf in tfCandidates)
+                using (bch)
+                {
+                    foreach (var oobdata in oobCandidates)
                     {
-                        var score = ScoreSamples(bch, layout, samples, oobdata, tf);
-                        long penalty = score.uncorrectable * 1_000_000L + score.bitflips;
+                        if (oobdata < 0 || oobdata > layout.EccOfs) continue;
 
-                        log?.Report($"[AutoDetect] t={t} oobdata={oobdata} tf={tf} -> uncor={score.uncorrectable} bitflips={score.bitflips} penalty={penalty}");
-
-                        if (penalty < bestPenalty)
+                        foreach (var tf in tfCandidates)
                         {
-                            bestPenalty = penalty;
-                            best = new DetectResult(poly, m, t, oobdata, tf, $"uncor={score.uncorrectable}, bitflips={score.bitflips}");
+                            var score = ScoreSamples(bch, layout, samples, oobdata, tf);
+                            long penalty = score.uncorrectable * 1_000_000L + score.bitflips;
+
+                            log?.Report($"[AutoDetect] t={t} oobdata={oobdata} tf={tf} -> uncor={score.uncorrectable} bitflips={score.bitflips} penalty={penalty}");
+
+                            if (penalty < bestPenalty)
+                            {
+                                bestPenalty = penalty;
+                                best = new DetectResult(poly, m, t, oobdata, tf, $"uncor={score.uncorrectable}, bitflips={score.bitflips}");
+                            }
                         }
                     }
                 }
             }
 
             return best;
+        }
+
+        // bch_init (kernel-style) fails when m*t > (2^m - 1). Filter impossible combos early.
+        private static bool IsBchParamPlausible(int m, int t)
+        {
+            if (t <= 0) return false;
+            // Most NAND BCH uses m in [5..15]. Keep it conservative to avoid huge allocations in native.
+            if (m < 5 || m > 15) return false;
+
+            long n = (1L << m) - 1;        // code length in bits
+            long eccBits = (long)m * t;   // required ecc bits
+            return eccBits <= n;
         }
 
         private static int GuessM(NandLayout layout)

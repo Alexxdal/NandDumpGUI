@@ -168,7 +168,7 @@
                 <ProgressBar x:Name="Prog" Height="18" VerticalAlignment="Center" Minimum="0" Maximum="100"/>
 
                 <Button x:Name="QuickTestButton" Grid.Column="1" Margin="10,0,0,0"
-            Content="Quick Test" Click="QuickTest_Click"
+            Content="Try Autodetect" Click="QuickTest_Click"
             ToolTip="Tries common polynomials/transforms/OOB-data values on a sample of pages and suggests the best parameters."/>
 
                 <Button x:Name="StartButton" Grid.Column="2" Margin="10,0,0,0" Content="Start" Click="Start_Click"/>

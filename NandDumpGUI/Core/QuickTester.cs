@@ -44,10 +44,25 @@ namespace NandDumpGUI.Core
 
         private static int EccBytes(int m, int t) => (m * t + 7) / 8;
 
+        // bch_init (kernel-style) fails when m*t > (2^m - 1). Filter impossible combos early.
+        private static bool IsBchParamPlausible(int m, int t)
+        {
+            if (t <= 0) return false;
+            // Most NAND BCH uses m in [5..15]. Keep it conservative to avoid huge allocations in native.
+            if (m < 5 || m > 15) return false;
+
+            long n = (1L << m) - 1;        // code length in bits
+            long eccBits = (long)m * t;   // required ecc bits
+            return eccBits <= n;
+        }
+
+
         // SAFE filter: native expects exactly BCH_ECC_BYTES(m,t). If we mismatch, it's dangerous.
         private static bool IsCandidateSafe(uint poly, int t, NandLayout layout)
         {
             int m = DegreeFromPoly(poly);
+            if (!IsBchParamPlausible(m, t))
+                return false;
             return EccBytes(m, t) == layout.EccLen;
         }
 
@@ -212,17 +227,32 @@ namespace NandDumpGUI.Core
                 ct.ThrowIfCancellationRequested();
                 var cand = candidates[i];
 
-                using var bch = BchContext.Create(cand.M, cand.T, cand.Poly, swapBits: cand.SwapBits);
+                BchContext bch;
+                try
+                {
+                    bch = BchContext.Create(cand.M, cand.T, cand.Poly, swapBits: cand.SwapBits);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    log?.Report($"[QT] bch_init failed: m={cand.M} t={cand.T} poly=0x{cand.Poly:X} swapBits={cand.SwapBits} -> {ex.Message}");
+                    continue;
+                }
 
-                var stats = EvaluateCandidate(bch, layout, cand, sampled, ct);
+                using (bch)
+                {
+                    var stats = EvaluateCandidate(bch, layout, cand, sampled, ct);
 
-                results.Add((cand, stats));
+                    results.Add((cand, stats));
 
-                if ((i & 0x7) == 0)
-                    progress?.Report((i + 1) * 100.0 / candidates.Count);
+                    if ((i & 0x7) == 0)
+                        progress?.Report((i + 1) * 100.0 / candidates.Count);
 
-                log?.Report($"[QT] {cand} => {stats}");
+                    log?.Report($"[QT] {cand} => {stats}");
+                }
             }
+
+            if (results.Count == 0)
+                throw new InvalidOperationException("All BCH candidates failed to initialize (bch_init). Try different polys / t values or check that ECC_LEN matches the real NAND ECC.");
 
             // Rank: lowest uncorrectable ratio, then highest ok, then highest bitflips
             var ranked = results

@@ -341,45 +341,24 @@ namespace NandDumpGUI
                 return;
             }
 
-            NandLayout layout;
-            uint manualPoly;
-            List<int> ts; // <-- fuori dal try, così la usi dopo
-
-            try
-            {
-                layout = ReadLayoutFromUi();
-
-                ts = new List<int> { int.Parse(TBox.Text.Trim()), 4, 8, 12, 16, 24, 32, 64 }
-                    .Distinct()
-                    .Where(x => x > 0)
-                    .ToList();
-
-                manualPoly = GetSelectedPoly();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Invalid settings: " + ex.Message);
-                return;
-            }
-
-            // candidate polynomials: presets + manual
+            // polinomi (presets + manuale)
+            uint manualPoly = GetSelectedPoly();
             var polys = PrimitivePolynomials.All.Select(p => p.Poly).ToList();
             if (!polys.Contains(manualPoly))
                 polys.Add(manualPoly);
 
-            // transforms to try
-            var transforms = new[] { TransformKind.None, TransformKind.Inv, TransformKind.Bitrev, TransformKind.InvBitrev };
+            // t candidates (include quello UI + alcuni classici)
+            var tCandidates = new List<int> { int.Parse(TBox.Text.Trim()), 2, 4, 8, 12, 16, 24, 32, 64 }
+                .Distinct()
+                .Where(x => x > 0)
+                .ToList();
 
-            // oobdata candidates (minimal set)
-            var oobCandidates = new HashSet<int> { 0, layout.EccOfs };
-            if (layout.EccOfs - 1 >= 0) oobCandidates.Add(layout.EccOfs - 1);
-            if (layout.EccOfs - 2 >= 0) oobCandidates.Add(layout.EccOfs - 2);
+            var transforms = new[] { TransformKind.None, TransformKind.Inv, TransformKind.Bitrev, TransformKind.InvBitrev };
 
             // UI state
             StartButton.IsEnabled = false;
             QuickTestButton.IsEnabled = false;
-
-            StopButton.IsEnabled = true;   // <-- abilita cancel per Quick Test
+            StopButton.IsEnabled = false;
             Prog.Value = 0;
 
             _cts = new CancellationTokenSource();
@@ -390,42 +369,51 @@ namespace NandDumpGUI
 
             try
             {
-                AppendLog("[QT] Starting quick test...");
+                AppendLog("[QT] Starting auto layout + parameter quick test...");
 
-                // 👇 ATTENZIONE: qui serve candidateTs (non t:)
-                var res = await QuickTester.RunAsync(
+                var res = await AutoLayoutTester.RunAsync(
                     inputRaw: inp,
-                    layout: layout,
-                    candidateTs: ts,
                     candidatePolys: polys,
+                    tCandidates: tCandidates,
                     transforms: transforms,
-                    oobDataCandidates: oobCandidates.ToList(),
-                    pagesToSample: 256,
+                    pagesToScoreLayouts: 64,
+                    pagesToSampleForParams: 128,
+                    maxLayoutsToTest: 6,
                     seed: 123,
-                    trySwapBits: true,     // se lo hai nel QuickTester esteso
-                    maxCandidates: 2000,   // opzionale, se lo hai
                     log: log,
                     progress: progress,
                     ct: ct);
 
                 AppendLog("");
                 AppendLog("[QT] Top results:");
-                foreach (var (cand, stats) in res.Ranked.Take(5))
-                    AppendLog($"   {cand} => {stats}");
+                foreach (var top in res.Top)
+                {
+                    AppendLog($"   layout={top.Layout.PageSize}+{top.Layout.OobSize} (sector={top.Layout.SectorSize}, chunk={top.Layout.OobChunk}, eccOfs={top.Layout.EccOfs}, eccLen={top.Layout.EccLen})");
+                    AppendLog($"   offset={top.Offset} score={top.LayoutScore:F3}  best={top.BestParams}  stats={top.Stats}");
+                    AppendLog("");
+                }
 
-                // Apply best settings to UI
-                PolyCombo.Text = $"0x{res.Best.Poly:X}";
-                TBox.Text = res.Best.T.ToString();                 // <-- applica anche t migliore
-                OobDataBox.Text = res.Best.OobDataBytes.ToString();
-                SetTransformSelection(res.Best.Transform);
-
-                // Se hai un checkbox SwapBits, applicalo:
-                // SwapBitsCheck.IsChecked = res.Best.SwapBits;
-
+                // Applica BEST alla UI
+                ApplyLayoutToUi(res.Best.Layout);
+                PolyCombo.Text = $"0x{res.Best.BestParams.Poly:X}";
+                TBox.Text = res.Best.BestParams.T.ToString();
+                OobDataBox.Text = res.Best.BestParams.OobDataBytes.ToString();
+                SetTransformSelection(res.Best.BestParams.Transform);
                 UpdatePolyInfo();
 
+                // NB: se Offset != 0, il file sembra avere un header/trailer.
+                // Per ora te lo segnalo: puoi aggiungere più avanti una "Input Offset" option al fixer.
+                string offsetNote = res.Best.Offset == 0
+                    ? "Offset looks aligned (0)."
+                    : $"Detected a likely alignment offset of {res.Best.Offset} bytes (header/trailer?). Consider trimming or adding an input-offset option.";
+
                 MessageBox.Show(
-                    $"Suggested parameters:\n\n{res.Best}\n{res.BestStats}\n\nApplied to the UI.",
+                    $"Suggested settings:\n\n" +
+                    $"Layout: page={res.Best.Layout.PageSize}, oob={res.Best.Layout.OobSize}, sector={res.Best.Layout.SectorSize}\n" +
+                    $"Chunk={res.Best.Layout.OobChunk}, ECC ofs={res.Best.Layout.EccOfs}, ECC len={res.Best.Layout.EccLen}\n\n" +
+                    $"Params: {res.Best.BestParams}\n" +
+                    $"Stats: {res.Best.Stats}\n\n" +
+                    offsetNote,
                     "Quick Test Result",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -443,9 +431,18 @@ namespace NandDumpGUI
                 _cts = null;
                 StartButton.IsEnabled = true;
                 QuickTestButton.IsEnabled = true;
-                StopButton.IsEnabled = false;
                 Prog.Value = 100;
             }
+        }
+
+        private void ApplyLayoutToUi(NandLayout l)
+        {
+            PageSizeBox.Text = l.PageSize.ToString();
+            OobSizeBox.Text = l.OobSize.ToString();
+            SectorSizeBox.Text = l.SectorSize.ToString();
+            OobChunkBox.Text = l.OobChunk.ToString();
+            EccOfsBox.Text = l.EccOfs.ToString();
+            EccLenBox.Text = l.EccLen.ToString();
         }
 
         private void SetTransformSelection(TransformKind k)
