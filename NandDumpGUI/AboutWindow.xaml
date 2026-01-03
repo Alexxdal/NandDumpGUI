@@ -1,0 +1,39 @@
+﻿<Window x:Class="NandDumpGUI.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        Title="About"
+        Height="260" Width="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock FontSize="18" FontWeight="Bold" Text="NandDumpGUI"/>
+
+        <StackPanel Grid.Row="1" Margin="0,12,0,0">
+            <TextBlock Text="Author:" FontWeight="Bold"/>
+            <TextBlock Text="Alessandro D'Alterio" Margin="0,2,0,10"/>
+
+            <TextBlock Text="Email:" FontWeight="Bold"/>
+            <TextBlock Margin="0,2,0,10">
+                <Hyperlink NavigateUri="mailto:alexdal@live.it" RequestNavigate="Hyperlink_RequestNavigate">
+                    alexdal@live.it
+                </Hyperlink>
+            </TextBlock>
+
+            <TextBlock Text="Website:" FontWeight="Bold"/>
+            <TextBlock Margin="0,2,0,0">
+                <Hyperlink NavigateUri="https://alexxdal.com" RequestNavigate="Hyperlink_RequestNavigate">
+                    alexxdal.com
+                </Hyperlink>
+            </TextBlock>
+        </StackPanel>
+
+        <Button Grid.Row="2" Content="Close" Width="90" HorizontalAlignment="Right" Click="Close_Click"/>
+    </Grid>
+</Window>

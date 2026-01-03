@@ -1,0 +1,186 @@
+﻿<Window x:Class="NandDumpGUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="NandDumpGUI"
+        Height="720" Width="980"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel Margin="10">
+
+        <!-- Menu -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="E_xit" Click="Exit_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_User Guide" Click="UserGuide_Click"/>
+                <Separator/>
+                <MenuItem Header="_About" Click="About_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <Grid Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Input/Output -->
+            <GroupBox Header="Files" Grid.Row="0" Padding="10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="90"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
+                               Text="Input RAW:"/>
+                    <TextBox x:Name="InpPath" Grid.Row="0" Grid.Column="1" Margin="6,0"
+                             ToolTip="RAW dump file containing pages stored as (PageSize + OobSize) adjacent bytes."/>
+                    <Button Grid.Row="0" Grid.Column="2" Content="Browse..." Click="BrowseInput_Click"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center"
+                               Text="Output data:" Margin="0,8,0,0"/>
+                    <TextBox x:Name="OutPath" Grid.Row="1" Grid.Column="1" Margin="6,8,6,0"
+                             ToolTip="Output file containing data-only pages (PageSize bytes each)."/>
+                    <Button Grid.Row="1" Grid.Column="2" Content="Browse..." Margin="0,8,0,0" Click="BrowseOutput_Click"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center"
+                               Text="Fixed RAW:" Margin="0,8,0,0"/>
+                    <TextBox x:Name="OutRawPath" Grid.Row="2" Grid.Column="1" Margin="6,8,6,0"
+                             ToolTip="Optional: save a corrected RAW (data + OOB) with fixed bits and (optionally) rewritten ECC."/>
+                    <Button Grid.Row="2" Grid.Column="2" Content="Browse..." Margin="0,8,0,0" Click="BrowseOutRaw_Click"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- Options -->
+            <GroupBox Header="ECC / BCH Options" Grid.Row="1" Margin="0,10,0,0" Padding="10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Primitive poly:"/>
+                    <ComboBox x:Name="PolyCombo" Grid.Row="0" Grid.Column="1" Margin="6,0"
+                      IsEditable="True"
+                      IsTextSearchEnabled="True"
+                      StaysOpenOnEdit="True"
+                      ToolTip="Primitive polynomial for GF(2^m). You can type a value (e.g., 0x5803) or pick a common preset from the list." />
+
+
+                    <TextBlock Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Text="t (bits):"/>
+                    <TextBox x:Name="TBox" Grid.Row="0" Grid.Column="3" Margin="6,0" Text="4"
+                             ToolTip="Error-correction strength (number of bit errors correctable per codeword). Typical: 4"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" VerticalAlignment="Center" Text="Transform:"/>
+                    <ComboBox x:Name="TransformBox" Grid.Row="1" Grid.Column="1" Margin="6,8,6,0" SelectedIndex="0"
+                              ToolTip="Transform applied to ECC bytes before decoding (to match vendor-specific storage).">
+                        <ComboBoxItem Content="none"/>
+                        <ComboBoxItem Content="inv"/>
+                        <ComboBoxItem Content="bitrev"/>
+                        <ComboBoxItem Content="inv+bitrev"/>
+                    </ComboBox>
+
+                    <TextBlock Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" VerticalAlignment="Center" Text="OOB data bytes:"/>
+                    <TextBox x:Name="OobDataBox" Grid.Row="1" Grid.Column="3" Margin="6,8,6,0" Text="9"
+                             ToolTip="How many OOB bytes are included in the message/codeword per sector before ECC (Broadcom often: 9)."/>
+
+                    <StackPanel Grid.Row="0" Grid.Column="4" Grid.RowSpan="2" Orientation="Vertical" Margin="20,0,0,0">
+                        <CheckBox x:Name="SkipErasedCheck" IsChecked="True"
+                                  Content="Skip erased sectors (all 0xFF)"
+                                  ToolTip="If enabled: sectors that are entirely 0xFF (data + OOB data + ECC) are skipped."/>
+                        <CheckBox x:Name="RewriteEccCheck" IsChecked="False" Margin="0,6,0,0"
+                                  Content="Rewrite ECC in RAW (if saving fixed RAW)"
+                                  ToolTip="If enabled: after correction, ECC is recomputed and written back to OOB in the fixed RAW file."/>
+                        <CheckBox x:Name="SaveRawCheck" IsChecked="False" Margin="0,6,0,0"
+                                  Content="Save fixed RAW (data + OOB)"
+                                  ToolTip="If enabled: the Fixed RAW file is written (data + OOB)."/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Layout -->
+            <Expander Header="Advanced NAND Layout (generic NAND support)" Grid.Row="2" Margin="0,10,0,0" IsExpanded="False">
+                <Border Padding="10" BorderBrush="#444" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="140"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="PageSize:"/>
+                        <TextBox x:Name="PageSizeBox" Grid.Row="0" Grid.Column="1" Margin="6,0" Text="2048"
+                                 ToolTip="Page data size in bytes. Common: 2048, 4096, 8192."/>
+                        <TextBlock Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Text="OobSize:"/>
+                        <TextBox x:Name="OobSizeBox" Grid.Row="0" Grid.Column="3" Margin="6,0" Text="64"
+                                 ToolTip="OOB/spare size in bytes. Common: 64 (for 2KB pages), 128 (for 4KB pages)."/>
+                        <TextBlock Grid.Row="0" Grid.Column="4" VerticalAlignment="Center" Text="SectorSize:"/>
+                        <TextBox x:Name="SectorSizeBox" Grid.Row="0" Grid.Column="5" Margin="6,0" Text="512"
+                                 ToolTip="ECC sector size in bytes. Common: 512 or 1024." />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" VerticalAlignment="Center" Text="OobChunk:"/>
+                        <TextBox x:Name="OobChunkBox" Grid.Row="1" Grid.Column="1" Margin="6,8,6,0" Text="16"
+                                 ToolTip="OOB chunk per sector. Common Broadcom layouts: 16 bytes per 512B sector."/>
+                        <TextBlock Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" VerticalAlignment="Center" Text="ECC offset:"/>
+                        <TextBox x:Name="EccOfsBox" Grid.Row="1" Grid.Column="3" Margin="6,8,6,0" Text="9"
+                                 ToolTip="Offset (within OobChunk) where ECC bytes start."/>
+                        <TextBlock Grid.Row="1" Grid.Column="4" Margin="0,8,0,0" VerticalAlignment="Center" Text="ECC length:"/>
+                        <TextBox x:Name="EccLenBox" Grid.Row="1" Grid.Column="5" Margin="6,8,6,0" Text="7"
+                                 ToolTip="Number of ECC bytes stored per sector (e.g., 7 for many BCH t=4 configs)."/>
+                    </Grid>
+                </Border>
+            </Expander>
+
+            <!-- Start/Stop + progress -->
+            <Grid Grid.Row="3" Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="90"/>
+                    <ColumnDefinition Width="90"/>
+                </Grid.ColumnDefinitions>
+
+                <ProgressBar x:Name="Prog" Height="18" VerticalAlignment="Center" Minimum="0" Maximum="100"/>
+
+                <Button x:Name="QuickTestButton" Grid.Column="1" Margin="10,0,0,0"
+            Content="Quick Test" Click="QuickTest_Click"
+            ToolTip="Tries common polynomials/transforms/OOB-data values on a sample of pages and suggests the best parameters."/>
+
+                <Button x:Name="StartButton" Grid.Column="2" Margin="10,0,0,0" Content="Start" Click="Start_Click"/>
+                <Button x:Name="StopButton"  Grid.Column="3" Margin="10,0,0,0" Content="Stop"  Click="Stop_Click" IsEnabled="False"/>
+            </Grid>
+
+            <!-- Log -->
+            <GroupBox Header="Log" Grid.Row="5" Margin="0,10,0,0" Padding="10">
+                <TextBox x:Name="LogBox" FontFamily="Consolas" FontSize="12"
+                         AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto" IsReadOnly="True"/>
+            </GroupBox>
+        </Grid>
+    </DockPanel>
+</Window>
