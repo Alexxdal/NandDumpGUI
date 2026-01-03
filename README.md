@@ -62,9 +62,6 @@ Example (common Broadcom-like layout):
 2. Build **NandDumpGUI** (x64 Debug/Release)
 3. Ensure `bchlib.dll` is copied into the WPF output folder:
    - `NandDumpGUI/bin/x64/(Debug|Release)/net8.0-windows/`
-
-**Tip:** use a Post-build event in the WPF project to copy the DLL using relative paths (so it works for other contributors too).
-
 ---
 
 ## Usage
